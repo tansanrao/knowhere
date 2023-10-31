@@ -36,4 +36,8 @@ else()
     target_link_libraries(knowhere_tests PRIVATE Catch2::Catch2WithMain knowhere)
 endif()
 
+if(WITH_PMEM)
+    target_link_libraries(knowhere_tests PRIVATE pmem pmemobj)
+endif()
+
 target_link_libraries(knowhere_tests PRIVATE atomic)

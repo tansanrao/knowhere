@@ -29,6 +29,7 @@ knowhere_option(WITH_BENCHMARK "Build with benchmark" OFF)
 knowhere_option(WITH_COVERAGE "Build with coverage" OFF)
 knowhere_option(WITH_CCACHE "Build with ccache" ON)
 knowhere_option(WITH_PROFILER "Build with profiler" OFF)
+knowhere_option(WITH_PMEM "Build with pmem" ON)
 
 if(KNOWHERE_VERSION)
   message(STATUS "Building KNOWHERE version: ${KNOWHERE_VERSION}")
@@ -110,6 +111,15 @@ if(WITH_DISKANN)
 else()
   knowhere_file_glob(GLOB_RECURSE KNOWHERE_DISKANN_SRCS src/index/diskann/*.cc)
   list(REMOVE_ITEM KNOWHERE_SRCS ${KNOWHERE_DISKANN_SRCS})
+endif()
+
+if(WITH_PMEM)
+  message("WITH_PMEM on, please ensure pmdk>=2 installed on machine")
+  find_library(pmem "pmem" "/usr/local/lib" REQUIRED)
+  find_library(pmemobj "pmemobj" "/usr/local/lib" REQUIRED)
+
+  list(APPEND KNOWHERE_LINKER_LIBS ${PMEM})
+  list(APPEND KNOWHERE_LINKER_LIBS ${PMEMOBJ})
 endif()
 
 knowhere_file_glob(GLOB_RECURSE KNOWHERE_GPU_SRCS src/index/gpu/flat_gpu/*.cc
