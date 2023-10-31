@@ -28,6 +28,7 @@
 #include "io/memory_io.h"
 #include "knowhere/config.h"
 #include "knowhere/heap.h"
+#include "knowhere/pmdk.h"
 #include "neighbor.h"
 #include "visited_list_pool.h"
 
@@ -57,10 +58,14 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
  public:
     static const tableint max_update_element_locks = 65536;
     HierarchicalNSW(SpaceInterface<dist_t>* s) {
+        // Initialize an NVMM Pool on PMEM using PMDK
+        void* nvm_root = init_nvmm_pool();
     }
 
     HierarchicalNSW(SpaceInterface<dist_t>* s, const std::string& location, bool nmslib = false,
                     size_t max_elements = 0) {
+        // Initialize an NVMM Pool on PMEM using PMDK
+        void* nvm_root = init_nvmm_pool();
         loadIndex(location, s, max_elements);
     }
 
@@ -69,6 +74,8 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         : link_list_locks_(max_elements),
           link_list_update_locks_(max_update_element_locks),
           element_levels_(max_elements) {
+        // Initialize an NVMM Pool on PMEM using PMDK
+        void* nvm_root = init_nvmm_pool();
         space_ = s;
         if (auto x = dynamic_cast<L2Space*>(s)) {
             metric_type_ = Metric::L2;
@@ -139,6 +146,9 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
     };
 
     ~HierarchicalNSW() {
+        // Destroy the PMDK NVMM Pool
+        destroy_nvmm_pool();
+
         if (mmap_enabled_) {
             munmap(map_, map_size_);
         } else {
