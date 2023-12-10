@@ -114,12 +114,12 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         // label_offset_ = size_links_level0_ + data_size_;
         offsetLevel0_ = 0;
 
-        data_level0_memory_ = (char*)malloc(max_elements_ * size_data_per_element_);  // NOLINT
+        data_level0_memory_ = (char*)nvm_alloc(max_elements_ * size_data_per_element_);  // NOLINT
         if (data_level0_memory_ == nullptr)
             throw std::runtime_error("Not enough memory");
 
         if (metric_type_ == Metric::COSINE) {
-            data_norm_l2_ = (float*)malloc(max_elements_ * sizeof(float));  // NOLINT
+            data_norm_l2_ = (float*)nvm_alloc(max_elements_ * sizeof(float));  // NOLINT
             if (data_norm_l2_ == nullptr)
                 throw std::runtime_error("Not enough memory");
         }
@@ -132,7 +132,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         enterpoint_node_ = -1;
         maxlevel_ = -1;
 
-        linkLists_ = (char**)malloc(sizeof(void*) * max_elements_);
+        linkLists_ = (char**)nvm_alloc(sizeof(void*) * max_elements_);
         if (linkLists_ == nullptr)
             throw std::runtime_error("Not enough memory: HierarchicalNSW failed to allocate linklists");
         size_links_per_element_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
@@ -149,25 +149,25 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
     ~HierarchicalNSW() {
         // Destroy the PMDK NVMM Pool
-        destroy_nvmm_pool();
 
         if (mmap_enabled_) {
             munmap(map_, map_size_);
         } else {
-            free(data_level0_memory_);
+            nvm_free(data_level0_memory_);
             if (metric_type_ == Metric::COSINE) {
-                free(data_norm_l2_);
+                nvm_free(data_norm_l2_);
             }
         }
 
         for (tableint i = 0; i < cur_element_count; i++) {
             if (element_levels_[i] > 0)
-                free(linkLists_[i]);
+                nvm_free(linkLists_[i]);
         }
-        free(linkLists_);
+        nvm_free(linkLists_);
         delete visited_list_pool_;
 
         delete space_;
+        destroy_nvmm_pool();
     }
 
     // used for free resource
@@ -739,12 +739,12 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 input.advance(cur_element_count * sizeof(float));
             }
         } else {
-            data_level0_memory_ = (char*)malloc(max_elements * size_data_per_element_);  // NOLINT
+            data_level0_memory_ = (char*)nvm_alloc(max_elements * size_data_per_element_);  // NOLINT
             input.read(data_level0_memory_, cur_element_count * size_data_per_element_);
 
             // for COSINE, need load data_norm_l2_
             if (metric_type_ == Metric::COSINE) {
-                data_norm_l2_ = (float*)malloc(max_elements * sizeof(float));  // NOLINT
+                data_norm_l2_ = (float*)nvm_alloc(max_elements * sizeof(float));  // NOLINT
                 input.read((char*)data_norm_l2_, cur_element_count * sizeof(float));
             }
         }
@@ -755,7 +755,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         visited_list_pool_ = new VisitedListPool(max_elements);
 
-        linkLists_ = (char**)malloc(sizeof(void*) * max_elements);  // NOLINT
+        linkLists_ = (char**)nvm_alloc(sizeof(void*) * max_elements);  // NOLINT
         if (linkLists_ == nullptr) {
             throw std::runtime_error("Not enough memory: loadIndex failed to allocate linklists");
         }
@@ -770,7 +770,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 linkLists_[i] = nullptr;
             } else {
                 element_levels_[i] = linkListSize / size_links_per_element_;
-                linkLists_[i] = (char*)malloc(linkListSize);
+                linkLists_[i] = (char*)nvm_alloc(linkListSize);
                 if (linkLists_[i] == nullptr) {
                     throw std::runtime_error("Not enough memory: loadIndex failed to allocate linklist");
                 }
@@ -864,14 +864,14 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         readBinaryPOD(input, mult_);
         readBinaryPOD(input, ef_construction_);
 
-        data_level0_memory_ = (char*)malloc(max_elements * size_data_per_element_);  // NOLINT
+        data_level0_memory_ = (char*)nvm_alloc(max_elements * size_data_per_element_);  // NOLINT
         if (data_level0_memory_ == nullptr)
             throw std::runtime_error("Not enough memory: loadIndex failed to allocate level0");
         input.read(data_level0_memory_, cur_element_count * size_data_per_element_);
 
         // for COSINE, need load data_norm_l2_
         if (metric_type_ == Metric::COSINE) {
-            data_norm_l2_ = (float*)malloc(max_elements * sizeof(float));  // NOLINT
+            data_norm_l2_ = (float*)nvm_alloc(max_elements * sizeof(float));  // NOLINT
             if (data_norm_l2_ == nullptr)
                 throw std::runtime_error("Not enough memory: loadIndex failed to allocate level0");
             input.read(data_norm_l2_, cur_element_count * sizeof(float));
@@ -883,7 +883,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
 
         visited_list_pool_ = new VisitedListPool(max_elements);
 
-        linkLists_ = (char**)malloc(sizeof(void*) * max_elements);
+        linkLists_ = (char**)nvm_alloc(sizeof(void*) * max_elements);
         if (linkLists_ == nullptr)
             throw std::runtime_error("Not enough memory: loadIndex failed to allocate linklists");
         element_levels_ = std::vector<int>(max_elements);
@@ -897,7 +897,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 linkLists_[i] = nullptr;
             } else {
                 element_levels_[i] = linkListSize / size_links_per_element_;
-                linkLists_[i] = (char*)malloc(linkListSize);
+                linkLists_[i] = (char*)nvm_alloc(linkListSize);
                 if (linkLists_[i] == nullptr)
                     throw std::runtime_error("Not enough memory: loadIndex failed to allocate linklist");
                 input.read(linkLists_[i], linkListSize);
@@ -1104,7 +1104,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         }
 
         if (curlevel) {
-            linkLists_[cur_c] = (char*)malloc(size_links_per_element_ * curlevel + 1);
+            linkLists_[cur_c] = (char*)nvm_alloc(size_links_per_element_ * curlevel + 1);
             if (linkLists_[cur_c] == nullptr)
                 throw std::runtime_error("Not enough memory: addPoint failed to allocate linklist");
             memset(linkLists_[cur_c], 0, size_links_per_element_ * curlevel + 1);

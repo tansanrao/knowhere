@@ -2,12 +2,14 @@
 
 #include "knowhere/pmem_util.h"
 
-static PMEMobjpool* g_pop;
+static PMEMobjpool* g_pop = NULL;
 static PMEMoid g_root;
 POBJ_LAYOUT_BEGIN(buff);
 POBJ_LAYOUT_TOID(buff, PMEMoid);
 POBJ_LAYOUT_END(buff);
+pthread_mutex_t pool_init_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_lock = PTHREAD_MUTEX_INITIALIZER;
+static unsigned int alloc_count = 0;
 alloc_info* info;
 static unsigned int alloc_index = 0;
 
@@ -15,44 +17,60 @@ void*
 init_nvmm_pool() {
     /* check if the path exsists already, else create one
      * or open the exsisting file*/
-    if (access(PMEM_PATH_DEF, F_OK) != 0) {
-        if ((g_pop = pmemobj_create(PMEM_PATH_DEF, POBJ_LAYOUT_NAME(tips), MEM_SIZE, 0666)) == NULL) {
-            perror("failed to create pool\n");
-            return NULL;
+
+    pthread_mutex_lock(&pool_init_lock);
+
+    if(!g_pop){
+        if (access(PMEM_PATH_DEF, F_OK) != 0) {
+            if ((g_pop = pmemobj_create(PMEM_PATH_DEF, POBJ_LAYOUT_NAME(tips), MEM_SIZE, 0666)) == NULL) {
+                perror("pmdk: failed to create pool\n");
+                alloc_count++;
+                pthread_mutex_unlock(&pool_init_lock);
+                return NULL;
+            }
+            // init_alloc_array();
+            printf("pmdk: created new pool\n");
+        } else {
+            if ((g_pop = pmemobj_open(PMEM_PATH_DEF, POBJ_LAYOUT_NAME(tips))) == NULL) {
+                perror("pmdk: failed to open the existing pool\n");
+                alloc_count++;
+                pthread_mutex_unlock(&pool_init_lock);
+                return NULL;
+            }
+            printf("pmdk: opened existing pool\n");
         }
-        printf("created new pool\n");
-    } else {
-        if ((g_pop = pmemobj_open(PMEM_PATH_DEF, POBJ_LAYOUT_NAME(tips))) == NULL) {
-            perror("failed to open th exsisting pool\n");
-            return NULL;
-        }
-        printf("opened existing pool\n");
+
+        /* allocate a root in the nvmem pool, here on root_obj*/
+        g_root = pmemobj_root(g_pop, sizeof(root_obj));
+
     }
-    /* allocate a root in the nvmem pool, here on root_obj*/
-    g_root = pmemobj_root(g_pop, sizeof(root_obj));
-    init_alloc_array();
+
+    alloc_count++;
+
+    pthread_mutex_unlock(&pool_init_lock);
+
     return pmemobj_direct(g_root);
 }
 
-void
-init_alloc_array() {
-    size_t alloc_size;
-    PMEMoid addr;
-    int ret;
+// void
+// init_alloc_array() {
+//     size_t alloc_size;
+//     PMEMoid addr;
+//     int ret;
 
-    alloc_size = ARRAY_SIZE * sizeof(*info);
-    ret = pmemobj_alloc(g_pop, &addr, alloc_size, 0, NULL, NULL);
-    if (ret) {
-        perror("alloc info failed");
-        exit(0);
-    }
-    info = (alloc_info*)pmemobj_direct(addr);
-    if (!info) {
-        perror("alloc array init failed");
-        exit(0);
-    }
-    return;
-}
+//     alloc_size = ARRAY_SIZE * sizeof(*info);
+//     ret = pmemobj_alloc(g_pop, &addr, alloc_size, 0, NULL, NULL);
+//     if (ret) {
+//         perror("alloc info failed");
+//         exit(0);
+//     }
+//     info = (alloc_info*)pmemobj_direct(addr);
+//     if (!info) {
+//         perror("alloc array init failed");
+//         exit(0);
+//     }
+//     return;
+// }
 
 void*
 nvm_alloc(size_t size) {
@@ -133,7 +151,12 @@ nvm_free(void* addr) {
 
 int
 destroy_nvmm_pool() {
-    pmemobj_close(g_pop);
-    g_pop = NULL;
+    pthread_mutex_lock(&pool_init_lock);
+    --alloc_count;
+    if(g_pop && (alloc_count==0)){
+        pmemobj_close(g_pop);
+        g_pop = NULL;
+    }
+    pthread_mutex_unlock(&pool_init_lock);
     return 0;
 }

@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-#define PMEM_PATH_DEF "/mnt/pmem1/milvus"
+#define PMEM_PATH_DEF "/mnt/pmem0/milvus"
 #define MEM_SIZE 463ul * 1024ul * 1024ul * 1024ul
 #define ARRAY_SIZE 50000000
 #define N_FL_THREADS 10
