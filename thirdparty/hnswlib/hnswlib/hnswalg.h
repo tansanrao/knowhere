@@ -114,7 +114,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         // label_offset_ = size_links_level0_ + data_size_;
         offsetLevel0_ = 0;
 
-        data_level0_memory_ = (char*)nvm_alloc(max_elements_ * size_data_per_element_);  // NOLINT
+        data_level0_memory_ = (char*)malloc(max_elements_ * size_data_per_element_);  // NOLINT
         if (data_level0_memory_ == nullptr)
             throw std::runtime_error("Not enough memory");
 
@@ -153,7 +153,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         if (mmap_enabled_) {
             munmap(map_, map_size_);
         } else {
-            nvm_free(data_level0_memory_);
+            free(data_level0_memory_);
             if (metric_type_ == Metric::COSINE) {
                 nvm_free(data_norm_l2_);
             }
@@ -739,7 +739,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
                 input.advance(cur_element_count * sizeof(float));
             }
         } else {
-            data_level0_memory_ = (char*)nvm_alloc(max_elements * size_data_per_element_);  // NOLINT
+            data_level0_memory_ = (char*)malloc(max_elements * size_data_per_element_);  // NOLINT
             input.read(data_level0_memory_, cur_element_count * size_data_per_element_);
 
             // for COSINE, need load data_norm_l2_
@@ -864,7 +864,7 @@ class HierarchicalNSW : public AlgorithmInterface<dist_t> {
         readBinaryPOD(input, mult_);
         readBinaryPOD(input, ef_construction_);
 
-        data_level0_memory_ = (char*)nvm_alloc(max_elements * size_data_per_element_);  // NOLINT
+        data_level0_memory_ = (char*)malloc(max_elements * size_data_per_element_);  // NOLINT
         if (data_level0_memory_ == nullptr)
             throw std::runtime_error("Not enough memory: loadIndex failed to allocate level0");
         input.read(data_level0_memory_, cur_element_count * size_data_per_element_);
